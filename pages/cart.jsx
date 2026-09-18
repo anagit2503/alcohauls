@@ -1,226 +1,75 @@
-import { useEffect } from 'react'
+import Head from 'next/head'
 import Link from 'next/link'
-import Image from 'next/image'
-import { useRouter } from 'next/router'
-import { FiTrash2, FiMinus, FiPlus } from 'react-icons/fi'
-import { useCartStore } from '@/store/cartStore'
-import { useAuthStore } from '@/store/authStore'
+import { useCartStore, useCartSummary } from '@/store/cartStore'
+import { getCategory, formatPrice } from '@/lib/products'
+import useHydrated from '@/hooks/useHydrated'
+import Bottle from '@/components/Bottle'
+import OrderSummary from '@/components/OrderSummary'
+import { QtyStepper, DeliveryProgress } from '@/components/CartDrawer'
 
 export default function Cart() {
-  const router = useRouter()
-  const { items, total, fetchCart, updateItem, removeItem, isLoading, error } = useCartStore()
-  const { user } = useAuthStore()
-
-  useEffect(() => {
-    if (user) {
-      fetchCart()
-    }
-  }, [user, fetchCart])
-
-  const handleQuantityChange = async (itemId, newQuantity) => {
-    if (newQuantity === 0) {
-      await removeItem(itemId)
-    } else {
-      await updateItem(itemId, newQuantity)
-    }
-  }
-
-  const handleRemoveItem = async (itemId) => {
-    if (window.confirm('Remove this item from your cart?')) {
-      await removeItem(itemId)
-    }
-  }
-
-  const handleCheckout = () => {
-    if (!user) {
-      router.push('/auth/login?redirect=/checkout')
-    } else {
-      router.push('/checkout')
-    }
-  }
-
-  if (!user) {
-    return (
-      <div className="section-padding">
-        <div className="container-custom">
-          <div className="text-center py-12">
-            <h1 className="mb-4">Your Shopping Cart</h1>
-            <p className="text-gray-600 mb-6">
-              Please log in to view your cart
-            </p>
-            <Link href="/auth/login" className="btn-primary">
-              Login
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const hydrated = useHydrated()
+  const { lines, count, subtotal, delivery, total } = useCartSummary()
+  const setQty = useCartStore((s) => s.setQty)
+  const removeItem = useCartStore((s) => s.removeItem)
 
   return (
-    <div className="section-padding">
-      <div className="container-custom">
-        <h1 className="mb-8">Your Shopping Cart</h1>
+    <>
+      <Head><title>Your bag | Alcohauls</title></Head>
+      <div className="wrap pt-10">
+        <h1 className="font-display text-[40px] sm:text-[48px]">Your bag</h1>
 
-        {error && (
-          <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {items.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 mb-6 text-lg">
-              Your cart is empty
-            </p>
-            <Link href="/products" className="btn-primary">
-              Continue Shopping
-            </Link>
+        {!hydrated ? null : lines.length === 0 ? (
+          <div className="mt-8 rounded-[4px] bg-stone px-6 py-20 text-center">
+            <p className="font-display text-[26px]">Your bag is empty</p>
+            <p className="mt-2 text-muted">Bottles you add will appear here.</p>
+            <Link href="/products" className="btn-primary mt-6">Browse the shop</Link>
           </div>
         ) : (
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Cart Items */}
-            <div className="lg:col-span-2">
-              <div className="card">
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex gap-4 p-6 border-b last:border-b-0"
-                  >
-                    {/* Image */}
+          <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_380px]">
+            <div>
+              <p className="text-[14px] text-muted price">{count} {count === 1 ? 'item' : 'items'}</p>
+              <ul className="mt-3 divide-y divide-line border-y border-line">
+                {lines.map(({ id, qty, product }) => (
+                  <li key={id} className="flex gap-5 py-6">
                     <Link
-                      href={`/products/${item.product.slug}`}
-                      className="relative w-24 h-24 flex-shrink-0"
+                      href={`/products/${product.slug}`}
+                      className="flex h-32 w-24 shrink-0 items-end justify-center rounded-[3px] pb-2 sm:h-36 sm:w-28"
+                      style={{ backgroundColor: getCategory(product.category).tint }}
                     >
-                      <Image
-                        src={item.product.image}
-                        alt={item.product.name}
-                        fill
-                        className="object-cover rounded"
-                      />
+                      <Bottle product={product} title={false} className="h-[88%]" />
                     </Link>
-
-                    {/* Product Details */}
-                    <div className="flex-1">
-                      <Link
-                        href={`/products/${item.product.slug}`}
-                        className="font-semibold text-gray-900 hover:text-wine-600"
-                      >
-                        {item.product.name}
-                      </Link>
-                      <p className="text-sm text-gray-600">
-                        {item.product.brand} • {item.product.volume}
-                      </p>
-                      <p className="text-wine-600 font-bold mt-2">
-                        ${parseFloat(item.product.final_price).toFixed(2)}
-                      </p>
-                    </div>
-
-                    {/* Quantity Control */}
-                    <div className="flex flex-col items-end">
-                      <div className="flex items-center border border-gray-300 rounded-lg mb-3">
-                        <button
-                          onClick={() =>
-                            handleQuantityChange(item.id, item.quantity - 1)
-                          }
-                          className="p-1 hover:bg-gray-100"
-                          disabled={isLoading}
-                        >
-                          <FiMinus size={16} />
-                        </button>
-                        <span className="px-4 py-1">{item.quantity}</span>
-                        <button
-                          onClick={() =>
-                            handleQuantityChange(item.id, item.quantity + 1)
-                          }
-                          className="p-1 hover:bg-gray-100"
-                          disabled={isLoading}
-                        >
-                          <FiPlus size={16} />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <div className="flex justify-between gap-4">
+                        <div>
+                          <Link href={`/products/${product.slug}`} className="text-[16px] font-medium hover:underline">{product.name}</Link>
+                          <p className="mt-0.5 text-[13px] text-muted">{product.volume}, {product.abv}% ABV</p>
+                          <p className="mt-1 text-[14px] price">{formatPrice(product.price)} each</p>
+                        </div>
+                        <p className="text-[16px] font-semibold price">{formatPrice(product.price * qty)}</p>
+                      </div>
+                      <div className="mt-auto flex items-center gap-5 pt-4">
+                        <QtyStepper value={qty} onChange={(q) => setQty(id, q)} />
+                        <button type="button" onClick={() => removeItem(id)} className="text-[14px] text-muted underline-offset-2 hover:text-ink hover:underline">
+                          Remove
                         </button>
                       </div>
-
-                      {/* Remove Button */}
-                      <button
-                        onClick={() => handleRemoveItem(item.id)}
-                        className="text-red-600 hover:text-red-700 flex items-center gap-1"
-                        disabled={isLoading}
-                      >
-                        <FiTrash2 size={16} />
-                        Remove
-                      </button>
                     </div>
-
-                    {/* Line Total */}
-                    <div className="text-right">
-                      <p className="text-gray-600 text-sm">Total</p>
-                      <p className="font-bold text-lg">
-                        ${parseFloat(item.item_total).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
+              <Link href="/products" className="mt-6 inline-block text-[14px] font-medium underline underline-offset-4">Continue shopping</Link>
             </div>
 
-            {/* Order Summary */}
-            <div className="lg:col-span-1">
-              <div className="card p-6 h-fit sticky top-24">
-                <h3 className="font-bold text-lg mb-6">Order Summary</h3>
-
-                <div className="space-y-3 mb-6 pb-6 border-b">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Subtotal</span>
-                    <span>${total.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Shipping</span>
-                    <span>Calculated at checkout</span>
-                  </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Tax</span>
-                    <span>Calculated at checkout</span>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center mb-6">
-                  <span className="font-bold">Total</span>
-                  <span className="text-2xl font-bold text-wine-600">
-                    ${total.toFixed(2)}
-                  </span>
-                </div>
-
-                <button
-                  onClick={handleCheckout}
-                  className="btn-primary w-full mb-3"
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Processing...' : 'Proceed to Checkout'}
-                </button>
-
-                <Link
-                  href="/products"
-                  className="btn-secondary w-full text-center"
-                >
-                  Continue Shopping
-                </Link>
-
-                {/* Discount Code */}
-                <div className="mt-6 pt-6 border-t">
-                  <input
-                    type="text"
-                    placeholder="Enter promo code"
-                    className="input-field w-full text-sm mb-2"
-                  />
-                  <button className="btn-outline w-full text-sm">
-                    Apply Code
-                  </button>
-                </div>
-              </div>
+            <div className="space-y-4 lg:sticky lg:top-[180px] lg:self-start">
+              <DeliveryProgress subtotal={subtotal} />
+              <OrderSummary subtotal={subtotal} delivery={delivery} total={total}>
+                <Link href="/checkout" className="btn-primary mt-6 h-12 w-full">Check out</Link>
+              </OrderSummary>
             </div>
           </div>
         )}
       </div>
-    </div>
+    </>
   )
 }

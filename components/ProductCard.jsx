@@ -1,156 +1,67 @@
-'use client'
-
-import { useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
-import { FiHeart, FiShoppingCart } from 'react-icons/fi'
-import { FaHeart, FaStar } from 'react-icons/fa'
-import { useWishlistStore } from '@/store/wishlistStore'
+import { Heart } from '@phosphor-icons/react'
+import { getCategory, formatPrice } from '@/lib/products'
 import { useCartStore } from '@/store/cartStore'
-import { useAuthStore } from '@/store/authStore'
-import StarRating from './StarRating'
+import { useWishlistStore } from '@/store/wishlistStore'
+import useHydrated from '@/hooks/useHydrated'
+import Bottle from './Bottle'
+import Rating from './Rating'
 
-export default function ProductCard({ product }) {
-  const [isAddingToCart, setIsAddingToCart] = useState(false)
-  const { user } = useAuthStore()
-  const { isInWishlist, toggleProduct } = useWishlistStore()
-  const { addItem } = useCartStore()
+export function WishlistButton({ id, name, className = '' }) {
+  const hydrated = useHydrated()
+  const saved = useWishlistStore((s) => s.ids.includes(id))
+  const toggle = useWishlistStore((s) => s.toggle)
+  const on = hydrated && saved
+  return (
+    <button
+      type="button"
+      onClick={() => toggle(id)}
+      aria-pressed={on}
+      aria-label={on ? `Remove ${name} from wishlist` : `Save ${name} to wishlist`}
+      className={`flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-ink shadow-[0_1px_2px_rgba(21,32,27,0.12)] hover:bg-white ${className}`}
+    >
+      <Heart size={18} weight={on ? 'fill' : 'light'} className={on ? 'text-claret' : ''} />
+    </button>
+  )
+}
 
-  const inWishlist = isInWishlist(product.id)
-
-  const handleAddToCart = async (e) => {
-    e.preventDefault()
-    setIsAddingToCart(true)
-    try {
-      await addItem(product.id, 1)
-      // Show success message (you can add a toast here)
-      alert('Added to cart!')
-    } catch (error) {
-      alert('Failed to add to cart')
-    } finally {
-      setIsAddingToCart(false)
-    }
-  }
-
-  const handleToggleWishlist = async (e) => {
-    e.preventDefault()
-    if (!user) {
-      alert('Please login to use wishlist')
-      return
-    }
-    try {
-      await toggleProduct(product.id)
-    } catch (error) {
-      alert('Failed to update wishlist')
-    }
-  }
-
-  const finalPrice = parseFloat(product.final_price)
-  const regularPrice = parseFloat(product.price)
-  const discountPercent = product.discounted_price
-    ? Math.round((1 - finalPrice / regularPrice) * 100)
-    : 0
+export default function ProductCard({ product, note }) {
+  const addItem = useCartStore((s) => s.addItem)
+  const cat = getCategory(product.category)
+  const href = `/products/${product.slug}`
 
   return (
-    <Link href={`/products/${product.slug}`}>
-      <div className="card overflow-hidden cursor-pointer group h-full flex flex-col">
-        {/* Image Container */}
-        <div className="relative overflow-hidden bg-gray-100 aspect-square">
-          <Image
-            src={product.image}
-            alt={product.name}
-            fill
-            className="object-cover group-hover:scale-110 transition duration-300"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          />
-
-          {/* Badges */}
-          <div className="absolute top-3 left-3 space-y-2">
-            {product.is_featured && (
-              <div className="badge badge-success">Featured</div>
-            )}
-            {product.is_new && (
-              <div className="badge bg-blue-100 text-blue-800">New</div>
-            )}
-            {discountPercent > 0 && (
-              <div className="badge bg-red-100 text-red-800">
-                -{discountPercent}%
-              </div>
-            )}
-          </div>
-
-          {/* Wishlist Button */}
-          <button
-            onClick={handleToggleWishlist}
-            className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md hover:shadow-lg transition"
-            title={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-          >
-            {inWishlist ? (
-              <FaHeart size={16} className="text-wine-600" />
-            ) : (
-              <FiHeart size={16} className="text-gray-600" />
-            )}
-          </button>
-
-          {/* Stock Status */}
-          {!product.is_in_stock && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-              <span className="text-white font-bold">Out of Stock</span>
-            </div>
-          )}
-        </div>
-
-        {/* Content */}
-        <div className="p-4 flex-1 flex flex-col">
-          {/* Category & Brand */}
-          <p className="text-xs text-gray-500 mb-1">
-            {product.category_name} • {product.brand}
-          </p>
-
-          {/* Name */}
-          <h3 className="font-semibold text-sm mb-2 truncate-2 text-gray-900">
-            {product.name}
-          </h3>
-
-          {/* Volume & ABV */}
-          <p className="text-xs text-gray-600 mb-3">
-            {product.volume}
-            {product.abv && ` • ${product.abv}% ABV`}
-          </p>
-
-          {/* Rating */}
-          <div className="flex items-center gap-2 mb-3">
-            <StarRating rating={product.average_rating} size={14} readOnly />
-            <span className="text-xs text-gray-600">
-              ({product.total_ratings})
-            </span>
-          </div>
-
-          {/* Pricing */}
-          <div className="mb-4">
-            <div className="flex items-baseline gap-2">
-              <span className="text-lg font-bold text-wine-600">
-                ${finalPrice.toFixed(2)}
-              </span>
-              {product.discounted_price && (
-                <span className="text-sm text-gray-500 line-through">
-                  ${regularPrice.toFixed(2)}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Add to Cart Button */}
-          <button
-            onClick={handleAddToCart}
-            disabled={!product.is_in_stock || isAddingToCart}
-            className="btn-primary w-full flex items-center justify-center gap-2 mt-auto"
-          >
-            <FiShoppingCart size={16} />
-            {isAddingToCart ? 'Adding...' : 'Add to Cart'}
-          </button>
-        </div>
+    <article className="group flex flex-col">
+      <div className="relative">
+        <Link
+          href={href}
+          className="flex aspect-[4/5] items-end justify-center overflow-hidden rounded-[3px] pb-[6%]"
+          style={{ backgroundColor: cat?.tint }}
+          aria-label={product.name}
+        >
+          <Bottle product={product} title={false} className="h-[82%] transition-transform duration-500 ease-out group-hover:-translate-y-1.5" />
+        </Link>
+        {product.tags.includes('new') && (
+          <span className="absolute left-3 top-3 rounded-[2px] bg-paper px-2 py-1 text-[12px] font-medium text-ink">New</span>
+        )}
+        <WishlistButton id={product.id} name={product.name} className="absolute right-3 top-3" />
       </div>
-    </Link>
+
+      <div className="mt-3 flex flex-1 flex-col">
+        <p className="text-[13px] text-muted">{product.style}, {product.region.split(',').pop().trim()}</p>
+        <h3 className="mt-0.5 text-[15px] font-medium leading-snug">
+          <Link href={href} className="hover:underline underline-offset-2">{product.name}</Link>
+        </h3>
+        {note && <p className="mt-2 text-[14px] italic font-display leading-snug text-ink/80">“{note}”</p>}
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-[15px] font-semibold price">{formatPrice(product.price)}</p>
+          <Rating value={product.rating} count={product.reviews} />
+        </div>
+        <p className="text-[12px] text-muted">{product.volume}, {product.abv}% ABV</p>
+        <button type="button" onClick={() => addItem(product.id)} className="btn-outline mt-3 h-10 w-full">
+          Add to bag
+        </button>
+      </div>
+    </article>
   )
 }

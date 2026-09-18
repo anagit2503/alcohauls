@@ -1,116 +1,47 @@
-import { useState } from 'react'
-import { useRouter } from 'next/router'
+import Head from 'next/head'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
+import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
+import AuthShell from '@/components/AuthShell'
 
 export default function Login() {
   const router = useRouter()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const login = useAuthStore((s) => s.login)
   const [error, setError] = useState('')
+  const next = typeof router.query.next === 'string' && router.query.next.startsWith('/') ? router.query.next : '/account'
 
-  const { login } = useAuthStore()
-
-  const handleSubmit = async (e) => {
+  const submit = (e) => {
     e.preventDefault()
-    setError('')
-    setIsLoading(true)
-
+    const form = new FormData(e.currentTarget)
     try {
-      await login(username, password)
-      const redirect = router.query.redirect || '/'
-      router.push(redirect)
+      login({ email: form.get('email'), password: form.get('password') })
+      router.push(next)
     } catch (err) {
-      setError(
-        err.response?.data?.detail ||
-        'Failed to login. Please check your credentials.'
-      )
-    } finally {
-      setIsLoading(false)
+      setError(err.message)
     }
   }
 
   return (
-    <div className="section-padding">
-      <div className="container-custom max-w-md">
-        <div className="card p-8">
-          <h1 className="mb-2">Welcome Back</h1>
-          <p className="text-gray-600 mb-8">Login to your account</p>
-
-          {error && (
-            <div className="bg-red-100 text-red-800 p-4 rounded-lg mb-6">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="input-field"
-                placeholder="Enter your username"
-                required
-              />
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className="block text-sm font-semibold mb-2">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-
-            {/* Remember Me */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="remember"
-                className="w-4 h-4"
-              />
-              <label htmlFor="remember" className="ml-2 text-sm">
-                Remember me
-              </label>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              className="btn-primary w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Logging in...' : 'Login'}
-            </button>
-          </form>
-
-          {/* Links */}
-          <div className="mt-6 space-y-3 text-center text-sm">
-            <div>
-              Don't have an account?{' '}
-              <Link href="/auth/register" className="text-wine-600 hover:text-wine-700 font-semibold">
-                Register here
-              </Link>
-            </div>
-            <Link href="/auth/forgot-password" className="text-wine-600 hover:text-wine-700">
-              Forgot password?
-            </Link>
+    <>
+      <Head><title>Sign in | Alcohauls</title></Head>
+      <AuthShell title="Sign in" intro="Track orders and check out faster.">
+        <form onSubmit={submit} className="space-y-4" noValidate={false}>
+          {error && <p role="alert" className="rounded-[3px] border border-claret/30 bg-claret/5 px-4 py-3 text-[14px] text-claret">{error}</p>}
+          <div>
+            <label htmlFor="email" className="label">Email</label>
+            <input id="email" name="email" type="email" autoComplete="email" required className="field" />
           </div>
-        </div>
-      </div>
-    </div>
+          <div>
+            <label htmlFor="password" className="label">Password</label>
+            <input id="password" name="password" type="password" autoComplete="current-password" required className="field" />
+          </div>
+          <button type="submit" className="btn-primary h-12 w-full">Sign in</button>
+        </form>
+        <p className="mt-6 text-[14px] text-muted">
+          New to Alcohauls? <Link href={`/auth/register${next !== '/account' ? `?next=${next}` : ''}`} className="font-medium text-ink underline underline-offset-2">Create an account</Link>
+        </p>
+      </AuthShell>
+    </>
   )
 }

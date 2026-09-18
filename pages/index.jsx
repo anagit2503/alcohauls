@@ -1,181 +1,164 @@
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { productsAPI } from '@/lib/api'
+import { Truck, Clock, IdentificationCard, Snowflake } from '@phosphor-icons/react'
+import { PRODUCTS, CATEGORIES, byTag, getProduct, FREE_DELIVERY_THRESHOLD } from '@/lib/products'
 import ProductCard from '@/components/ProductCard'
-import { FiArrowRight } from 'react-icons/fi'
+import Bottle from '@/components/Bottle'
+import SectionHead from '@/components/Section'
+
+// Bottles on the hero shelf, left to right.
+const SHELF = [17, 1, 9, 12, 24, 6]
+
+const POPULAR = ['Champagne', 'Single malt', 'Rosé', 'Tequila', 'Pinot Noir']
+
+const SERVICES = [
+  { icon: Clock, title: 'Same-day delivery', text: 'Order by 4pm, delivered this evening.' },
+  { icon: Truck, title: `Free over $${FREE_DELIVERY_THRESHOLD}`, text: 'Otherwise a flat $6.95.' },
+  { icon: Snowflake, title: 'Arrives chilled', text: 'Whites and fizz come ready to pour.' },
+  { icon: IdentificationCard, title: 'ID checked at the door', text: 'Recipients must be 21 or over.' },
+]
+
+// The first product in each category, shown on its tile.
+const catBottle = (slug) => PRODUCTS.find((p) => p.category === slug)
+const catCount = (slug) => PRODUCTS.filter((p) => p.category === slug).length
 
 export default function Home() {
-  const [featuredProducts, setFeaturedProducts] = useState([])
-  const [newProducts, setNewProducts] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const [featured, newProds] = await Promise.all([
-          productsAPI.featured(),
-          productsAPI.new(),
-        ])
-        setFeaturedProducts(featured.data.results || featured.data)
-        setNewProducts(newProds.data.results || newProds.data)
-      } catch (error) {
-        console.error('Failed to fetch products:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchProducts()
-  }, [])
+  const bestsellers = byTag('bestseller').slice(0, 8)
+  const staff = byTag('staff')
+  const fresh = byTag('new').slice(0, 4)
 
   return (
-    <div>
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-wine-600 to-wine-800 text-white py-20">
-        <div className="container-custom">
-          <div className="max-w-2xl">
-            <h1 className="text-5xl font-bold mb-6">
-              Premium Liquor, Delivered
+    <>
+      {/* Hero */}
+      <section className="wrap pt-6 sm:pt-10">
+        <div className="grid grid-cols-1 overflow-hidden rounded-[4px] lg:grid-cols-[1.1fr_1fr]">
+          <div className="flex min-w-0 flex-col justify-center bg-stone px-6 py-12 sm:px-12 lg:py-16">
+            <h1 className="font-display text-[44px] leading-[1.02] tracking-[-0.015em] sm:text-[58px] xl:text-[66px]">
+              Good bottles, at your door tonight.
             </h1>
-            <p className="text-xl mb-8 text-wine-100">
-              Discover the finest selection of bourbon, scotch, wine, tequila, and more. 
-              All delivered right to your door.
+            <p className="mt-5 max-w-md text-[17px] leading-relaxed text-ink/80">
+              Wine, spirits and beer from independent makers, chosen by our buyers and delivered the same day.
             </p>
-            <div className="flex gap-4">
-              <Link href="/products" className="btn-primary bg-gold-500 hover:bg-gold-600 text-slate-900">
-                Shop Now
-              </Link>
-              <Link href="/about" className="btn-outline border-white text-white hover:bg-white hover:text-wine-600">
-                Learn More
-              </Link>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href="/products" className="btn-primary h-12 px-7">Shop all bottles</Link>
+              <Link href="/products?sort=rating" className="btn-outline h-12 px-7">See top rated</Link>
+            </div>
+            <div className="mt-9">
+              <p className="text-[13px] text-muted">Popular right now</p>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {POPULAR.map((term) => (
+                  <li key={term}>
+                    <Link
+                      href={`/products?q=${encodeURIComponent(term)}`}
+                      className="inline-block rounded-full border border-ink/15 bg-paper px-3.5 py-1.5 text-[13px] hover:border-ink"
+                    >
+                      {term}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="relative flex min-h-[340px] min-w-0 items-end bg-bottle px-4 pb-10 pt-16 sm:min-h-[460px] sm:px-10">
+            <p className="absolute left-6 top-6 max-w-[16rem] font-display text-[17px] italic leading-snug text-paper/85 sm:left-10 sm:top-8">
+              This week’s shelf, picked by our buyers
+            </p>
+            <div className="relative w-full">
+              <ul className="relative z-10 flex items-end justify-between gap-1 sm:gap-3">
+                {SHELF.map((id, i) => {
+                  const p = getProduct(id)
+                  return (
+                    <li key={id} className="shelf-bottle min-w-0 flex-1" style={{ animationDelay: `${120 + i * 90}ms` }}>
+                      <Link href={`/products/${p.slug}`} className="group block" aria-label={p.name}>
+                        <Bottle product={p} title={false} className="mx-auto block h-auto max-h-[180px] w-full transition-transform duration-300 group-hover:-translate-y-2 sm:max-h-[270px]" />
+                      </Link>
+                    </li>
+                  )
+                })}
+              </ul>
+              {/* shelf */}
+              <div className="relative -mt-[6px] h-3 rounded-[1px] bg-brass shadow-[0_10px_24px_rgba(0,0,0,0.35)]" />
+              <div className="h-2 bg-gradient-to-b from-black/25 to-transparent" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="section-padding bg-white">
-        <div className="container-custom">
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-wine-600 mb-3">🚚</div>
-              <h3 className="text-xl font-bold mb-2">Fast Delivery</h3>
-              <p className="text-gray-600">
-                Get your order delivered in 1-2 business days
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-wine-600 mb-3">🔒</div>
-              <h3 className="text-xl font-bold mb-2">Secure Checkout</h3>
-              <p className="text-gray-600">
-                Your payment information is encrypted and safe
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-wine-600 mb-3">⭐</div>
-              <h3 className="text-xl font-bold mb-2">Best Selection</h3>
-              <p className="text-gray-600">
-                Curated collection of premium spirits
-              </p>
-            </div>
+      {/* Service strip */}
+      <section className="wrap mt-6">
+        <ul className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-line pb-8 pt-4 lg:grid-cols-4">
+          {SERVICES.map(({ icon: Icon, title, text }) => (
+            <li key={title} className="flex gap-3">
+              <Icon size={26} weight="light" className="mt-0.5 shrink-0 text-bottle" />
+              <div>
+                <p className="text-[14px] font-semibold">{title}</p>
+                <p className="text-[13px] text-muted">{text}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Categories */}
+      <section className="wrap mt-16">
+        <SectionHead title="Shop by category" href="/products" linkText="Shop all" />
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {CATEGORIES.map((c) => {
+            const p = catBottle(c.slug)
+            return (
+              <li key={c.slug}>
+                <Link
+                  href={`/products?category=${c.slug}`}
+                  className="group flex h-full items-end justify-between gap-2 overflow-hidden rounded-[3px] pl-4 pt-4 sm:pl-5 sm:pt-5"
+                  style={{ backgroundColor: c.tint }}
+                >
+                  <div className="pb-4 sm:pb-5">
+                    <p className="text-[15px] font-semibold leading-tight sm:text-[16px]">{c.name}</p>
+                    <p className="mt-0.5 text-[13px] text-muted">{catCount(c.slug)} bottles</p>
+                  </div>
+                  <Bottle product={p} title={false} className="-mb-6 h-[120px] shrink-0 transition-transform duration-300 group-hover:-translate-y-1 sm:h-[150px]" />
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      {/* Bestsellers */}
+      <section className="wrap mt-20">
+        <SectionHead
+          title="Bestsellers"
+          intro="What our customers reorder most."
+          href="/products?sort=popular"
+          linkText="See all"
+        />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4">
+          {bestsellers.map((p) => <ProductCard key={p.id} product={p} />)}
+        </div>
+      </section>
+
+      {/* Staff picks */}
+      <section className="mt-24 bg-stone py-16">
+        <div className="wrap grid gap-10 lg:grid-cols-[1fr_3fr]">
+          <div>
+            <h2 className="font-display text-[34px] leading-tight sm:text-[40px]">What we’re drinking</h2>
+            <p className="mt-3 max-w-sm text-muted">
+              Our buyers taste everything before it goes on sale. These are the bottles they keep taking home.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4">
+            {staff.map((p) => <ProductCard key={p.id} product={p} note={p.staffNote} />)}
           </div>
         </div>
       </section>
 
-      {/* Featured Products */}
-      <section className="section-padding">
-        <div className="container-custom">
-          <div className="flex justify-between items-center mb-10">
-            <h2>Featured Products</h2>
-            <Link href="/products?featured=true" className="flex items-center gap-2 text-wine-600 hover:text-wine-700">
-              View All <FiArrowRight size={18} />
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="grid-auto-fit">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="card skeleton h-96" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid-auto-fit">
-              {featuredProducts.slice(0, 4).map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          )}
+      {/* New */}
+      <section className="wrap mt-20">
+        <SectionHead title="Just in" intro="New to the shop this month." href="/products?sort=newest" linkText="See all new" />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4">
+          {fresh.map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
       </section>
-
-      {/* New Arrivals */}
-      <section className="section-padding bg-gray-100">
-        <div className="container-custom">
-          <div className="flex justify-between items-center mb-10">
-            <h2>New Arrivals</h2>
-            <Link href="/products?new=true" className="flex items-center gap-2 text-wine-600 hover:text-wine-700">
-              View All <FiArrowRight size={18} />
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="grid-auto-fit">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="card skeleton h-96" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid-auto-fit">
-              {newProducts.slice(0, 4).map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Categories Section */}
-      <section className="section-padding">
-        <div className="container-custom">
-          <h2 className="mb-10">Shop by Category</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { name: 'Bourbon', icon: '🥃' },
-              { name: 'Scotch', icon: '🏴󐁧󐁢󐁳󐁣󐁴󐁿' },
-              { name: 'Wine', icon: '🍷' },
-              { name: 'Tequila', icon: '🌵' },
-            ].map((category) => (
-              <Link
-                key={category.name}
-                href={`/products?category=${category.name.toLowerCase()}`}
-                className="card p-6 text-center hover:shadow-xl transition"
-              >
-                <div className="text-5xl mb-3">{category.icon}</div>
-                <h3 className="font-bold">{category.name}</h3>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Newsletter Section */}
-      <section className="bg-wine-600 text-white section-padding">
-        <div className="container-custom max-w-2xl mx-auto text-center">
-          <h2 className="mb-4">Get Exclusive Offers</h2>
-          <p className="mb-6 text-wine-100">
-            Subscribe to our newsletter for deals, new arrivals, and special promotions
-          </p>
-          <form className="flex gap-2">
-            <input
-              type="email"
-              placeholder="Enter your email"
-              className="flex-1 px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-gold-500"
-            />
-            <button type="submit" className="btn-primary bg-gold-500 hover:bg-gold-600 text-slate-900">
-              Subscribe
-            </button>
-          </form>
-        </div>
-      </section>
-    </div>
+    </>
   )
 }
