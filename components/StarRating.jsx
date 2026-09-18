@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FaStarFill, FaStarHalfAlt } from 'react-icons/fa'
+import { FaStar, FaStarHalfAlt } from 'react-icons/fa'
 import { FiStar } from 'react-icons/fi'
 
 export default function StarRating({ 
@@ -48,7 +48,7 @@ export default function StarRating({
             title={`Rate ${index} stars`}
           >
             {displayRating >= index ? (
-              <FaStarFill size={size} className="text-gold-500" />
+              <FaStar size={size} className="text-gold-500" />
             ) : displayRating >= index - 0.5 ? (
               <FaStarHalfAlt size={size} className="text-gold-500" />
             ) : (
