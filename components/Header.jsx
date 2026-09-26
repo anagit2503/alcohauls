@@ -55,14 +55,15 @@ export default function Header() {
   const openCart = useCartStore((s) => s.open)
   const activeCat = router.pathname === '/products' ? router.query.category : undefined
 
-  const iconBtn = 'relative flex h-10 w-10 items-center justify-center rounded-full text-ink hover:bg-stone'
+  const iconBtn = 'relative flex h-10 w-10 items-center justify-center rounded-full text-paper hover:bg-white/10'
 
   return (
     <header className="sticky top-0 z-30 bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/85">
-      <div className="wrap flex h-[72px] items-center gap-4 lg:gap-10">
-        <Link href="/" className="shrink-0 leading-none text-ink">
+      <div className="bg-ink text-paper">
+        <div className="wrap flex h-[72px] items-center gap-4 lg:gap-10">
+        <Link href="/" className="shrink-0 leading-none text-paper">
           <span className="block font-display text-[26px] tracking-[-0.01em]">{SHOP.shortName}</span>
-          <span className="block text-[11px] tracking-[0.14em] text-muted">{SHOP.tagline}</span>
+          <span className="block text-[11px] tracking-[0.14em] text-paper/60">{SHOP.tagline}</span>
         </Link>
         <SearchForm className="hidden flex-1 md:block max-w-xl" />
         <nav aria-label="Account" className="ml-auto flex items-center gap-1">
@@ -78,10 +79,11 @@ export default function Header() {
             {hydrated && <Badge n={count} />}
           </button>
         </nav>
-      </div>
+        </div>
 
-      <div className="wrap pb-3 md:hidden">
-        <SearchForm />
+        <div className="wrap pb-3 md:hidden">
+          <SearchForm />
+        </div>
       </div>
 
       <nav aria-label="Categories" className="border-y border-line">
