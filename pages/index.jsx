@@ -3,7 +3,7 @@ import { IdentificationCard, Snowflake } from '@phosphor-icons/react'
 import { isAvailable } from '@/lib/products'
 import { getAllProducts, toCard, categoriesWithCounts, usingSquare, REVALIDATE } from '@/lib/catalog'
 import ProductCard from '@/components/ProductCard'
-import { ProductImage } from '@/components/Bottle'
+import Bottle, { ProductImage } from '@/components/Bottle'
 import SectionHead from '@/components/Section'
 
 // Demo bottles on the hero shelf, left to right.
@@ -136,9 +136,7 @@ export default function Home({ shelf, categories, bestsellers, staff, fresh }) {
                     <p className="text-[15px] font-semibold leading-tight sm:text-[16px]">{c.name}</p>
                     <p className="mt-0.5 text-[13px] text-muted">{c.count} {c.count === 1 ? 'bottle' : 'bottles'}</p>
                   </div>
-                  <div className="-mb-4 flex h-[116px] w-[104px] shrink-0 items-center justify-center overflow-hidden rounded-t-[3px] bg-white p-2 transition-transform duration-300 group-hover:-translate-y-1 sm:h-[146px] sm:w-[130px]">
-                    <ProductImage product={p} title={false} bottleClassName="h-[90%]" />
-                  </div>
+                  <Bottle product={p} title={false} className="-mb-6 h-[120px] shrink-0 transition-transform duration-300 group-hover:-translate-y-1 sm:h-[150px]" />
                 </Link>
               </li>
             )
