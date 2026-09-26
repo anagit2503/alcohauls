@@ -3,7 +3,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useMemo, useState } from 'react'
 import { SlidersHorizontal, X } from '@phosphor-icons/react'
-import { PRODUCTS, CATEGORIES, getCategory } from '@/lib/products'
+import { getCategory } from '@/lib/products'
+import { getAllProducts, toCard, categoriesWithCounts, availableFirst, REVALIDATE } from '@/lib/catalog'
 import ProductCard from '@/components/ProductCard'
 
 const SORTS = [
@@ -20,12 +21,23 @@ const PRICES = [
   { value: 'over-60', label: 'Over $60', test: (p) => p > 60 },
 ]
 
+export async function getStaticProps() {
+  const all = await getAllProducts()
+  return {
+    props: {
+      products: all.map((p) => ({ ...toCard(p), notes: p.notes || [] })),
+      categories: categoriesWithCounts(all),
+    },
+    revalidate: REVALIDATE,
+  }
+}
+
 function matches(p, q) {
-  const hay = [p.name, p.maker, p.style, p.region, getCategory(p.category)?.name, ...p.notes].join(' ').toLowerCase()
+  const hay = [p.name, p.maker, p.style, p.region, p.volume, getCategory(p.category)?.name, ...p.notes].join(' ').toLowerCase()
   return q.toLowerCase().split(/\s+/).filter(Boolean).every((w) => hay.includes(w))
 }
 
-export default function Products() {
+export default function Products({ products, categories }) {
   const router = useRouter()
   const { category, q, sort = 'popular', price } = router.query
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -39,20 +51,23 @@ export default function Products() {
   }
 
   const results = useMemo(() => {
-    let list = PRODUCTS.slice()
+    let list = products.slice()
     if (cat) list = list.filter((p) => p.category === cat.slug)
     if (typeof q === 'string' && q.trim()) list = list.filter((p) => matches(p, q))
     const band = PRICES.find((b) => b.value === price)
     if (band) list = list.filter((p) => band.test(p.price))
     const sorters = {
-      popular: (a, b) => b.reviews - a.reviews,
-      rating: (a, b) => b.rating - a.rating || b.reviews - a.reviews,
+      popular: (a, b) => (b.reviews ?? 0) - (a.reviews ?? 0),
+      rating: (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || (b.reviews ?? 0) - (a.reviews ?? 0),
       'price-asc': (a, b) => a.price - b.price,
       'price-desc': (a, b) => b.price - a.price,
-      newest: (a, b) => Number(b.tags.includes('new')) - Number(a.tags.includes('new')) || b.id - a.id,
+      newest: (a, b) => Number(b.tags.includes('new')) - Number(a.tags.includes('new')) || String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')),
     }
-    return list.sort(sorters[sort] || sorters.popular)
-  }, [cat, q, price, sort])
+    return availableFirst(list.sort(sorters[sort] || sorters.popular))
+  }, [products, cat, q, price, sort])
+
+  // Square products have no ratings, so hide that sort.
+  const sorts = products.some((p) => p.rating != null) ? SORTS : SORTS.filter((s) => s.value !== 'rating')
 
   const title = q ? `Results for “${q}”` : cat ? cat.name : 'All bottles'
   const hasFilters = Boolean(cat || q || price)
@@ -64,13 +79,13 @@ export default function Products() {
         <ul className="mt-3 space-y-1">
           <li>
             <button type="button" onClick={() => setParam('category')} className={`w-full py-1 text-left text-[14px] ${!cat ? 'font-semibold text-ink' : 'text-muted hover:text-ink'}`}>
-              All categories <span className="text-muted font-normal price">({PRODUCTS.length})</span>
+              All categories <span className="text-muted font-normal price">({products.length})</span>
             </button>
           </li>
-          {CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <li key={c.slug}>
               <button type="button" onClick={() => setParam('category', c.slug)} className={`w-full py-1 text-left text-[14px] ${cat?.slug === c.slug ? 'font-semibold text-ink' : 'text-muted hover:text-ink'}`}>
-                {c.name} <span className="text-muted font-normal price">({PRODUCTS.filter((p) => p.category === c.slug).length})</span>
+                {c.name} <span className="text-muted font-normal price">({c.count})</span>
               </button>
             </li>
           ))}
@@ -104,7 +119,7 @@ export default function Products() {
 
   return (
     <>
-      <Head><title>{`${title} | Alcohauls`}</title></Head>
+      <Head><title>{`${title} | Noma Wine &amp; Liquor`}</title></Head>
       <div className="wrap pt-10">
         <nav aria-label="Breadcrumb" className="text-[13px] text-muted">
           <Link href="/" className="hover:text-ink">Home</Link>
@@ -134,13 +149,13 @@ export default function Products() {
                   onChange={(e) => setParam('sort', e.target.value === 'popular' ? undefined : e.target.value)}
                   className="h-9 rounded-[3px] border border-line bg-white pl-3 pr-8 text-[14px] focus:border-bottle focus:outline-none"
                 >
-                  {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                  {sorts.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                 </select>
               </div>
             </div>
 
             {results.length ? (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 xl:grid-cols-3">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 sm:gap-x-6 xl:grid-cols-4 2xl:grid-cols-5">
                 {results.map((p) => <ProductCard key={p.id} product={p} />)}
               </div>
             ) : (

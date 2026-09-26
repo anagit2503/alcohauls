@@ -2,10 +2,11 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useEffect, useState } from 'react'
 import { MagnifyingGlass, Heart, Handbag, User } from '@phosphor-icons/react'
-import { CATEGORIES, FREE_DELIVERY_THRESHOLD } from '@/lib/products'
+import { CATEGORIES } from '@/lib/products'
+import { SHOP } from '@/lib/shop'
 import { useCartStore, useCartSummary } from '@/store/cartStore'
 import { useWishlistStore } from '@/store/wishlistStore'
-import { useAuthStore } from '@/store/authStore'
+import useUser from '@/hooks/useUser'
 import useHydrated from '@/hooks/useHydrated'
 
 function SearchForm({ className = '' }) {
@@ -49,8 +50,8 @@ export default function Header() {
   const router = useRouter()
   const hydrated = useHydrated()
   const { count } = useCartSummary()
-  const wishCount = useWishlistStore((s) => s.ids.length)
-  const user = useAuthStore((s) => s.user)
+  const wishCount = useWishlistStore((s) => s.items.length)
+  const { user } = useUser()
   const openCart = useCartStore((s) => s.open)
   const activeCat = router.pathname === '/products' ? router.query.category : undefined
 
@@ -58,16 +59,10 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-30 bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/85">
-      <div className="bg-bottle text-paper/90">
-        <div className="wrap flex h-9 items-center justify-center text-[13px] sm:justify-between">
-          <p>Free delivery on orders over ${FREE_DELIVERY_THRESHOLD}</p>
-          <p className="hidden sm:block">Order by 4pm for same-day delivery</p>
-        </div>
-      </div>
-
       <div className="wrap flex h-[72px] items-center gap-4 lg:gap-10">
-        <Link href="/" className="font-display text-[28px] leading-none tracking-[-0.01em] text-ink">
-          Alcohauls
+        <Link href="/" className="shrink-0 leading-none text-ink">
+          <span className="block font-display text-[26px] tracking-[-0.01em]">{SHOP.shortName}</span>
+          <span className="block text-[11px] tracking-[0.14em] text-muted">{SHOP.tagline}</span>
         </Link>
         <SearchForm className="hidden flex-1 md:block max-w-xl" />
         <nav aria-label="Account" className="ml-auto flex items-center gap-1">
@@ -90,7 +85,7 @@ export default function Header() {
       </div>
 
       <nav aria-label="Categories" className="border-y border-line">
-        <ul className="wrap flex gap-6 overflow-x-auto whitespace-nowrap text-[14px] [scrollbar-width:none]">
+        <ul className="wrap flex gap-x-6 overflow-x-auto whitespace-nowrap text-[14px] [scrollbar-width:none] lg:flex-wrap lg:overflow-x-visible">
           <li>
             <Link
               href="/products"
@@ -99,7 +94,7 @@ export default function Header() {
               Shop all
             </Link>
           </li>
-          {CATEGORIES.map((c) => (
+          {CATEGORIES.filter((c) => c.slug !== 'other').map((c) => (
             <li key={c.slug}>
               <Link
                 href={`/products?category=${c.slug}`}

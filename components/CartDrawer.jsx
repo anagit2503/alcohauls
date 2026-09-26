@@ -2,8 +2,9 @@ import Link from 'next/link'
 import { useEffect, useRef } from 'react'
 import { X, Minus, Plus } from '@phosphor-icons/react'
 import { useCartStore, useCartSummary } from '@/store/cartStore'
-import { FREE_DELIVERY_THRESHOLD, formatPrice } from '@/lib/products'
-import Bottle from './Bottle'
+import { MIN_ORDER, formatPrice } from '@/lib/products'
+import { ProductImage } from './Bottle'
+import { productSpecs } from './ProductCard'
 
 export function QtyStepper({ value, onChange, size = 'sm' }) {
   const h = size === 'sm' ? 'h-9' : 'h-11'
@@ -21,14 +22,14 @@ export function QtyStepper({ value, onChange, size = 'sm' }) {
 }
 
 export function DeliveryProgress({ subtotal }) {
-  const left = FREE_DELIVERY_THRESHOLD - subtotal
-  const pct = Math.min(100, (subtotal / FREE_DELIVERY_THRESHOLD) * 100)
+  const left = MIN_ORDER - subtotal
+  const pct = Math.min(100, (subtotal / MIN_ORDER) * 100)
   return (
     <div>
       <p className="text-[13px] text-ink">
         {left > 0
-          ? <>Add <span className="font-semibold price">{formatPrice(left)}</span> more for free delivery</>
-          : 'Your order qualifies for free delivery'}
+          ? <>Add <span className="font-semibold price">{formatPrice(left)}</span> more to reach the {formatPrice(MIN_ORDER)} minimum</>
+          : 'Your order meets the minimum'}
       </p>
       <div className="mt-2 h-1 rounded-full bg-line">
         <div className="h-1 rounded-full bg-brass transition-[width] duration-500" style={{ width: `${pct}%` }} />
@@ -90,17 +91,17 @@ export default function CartDrawer() {
             <ul className="flex-1 divide-y divide-line overflow-y-auto px-6">
               {lines.map(({ id, qty, product }) => (
                 <li key={id} className="flex gap-4 py-5">
-                  <Link href={`/products/${product.slug}`} onClick={close} className="flex h-24 w-16 shrink-0 items-end justify-center rounded-[3px] bg-stone">
-                    <Bottle product={product} title={false} className="h-[88px]" />
+                  <Link href={`/products/${product.slug}`} onClick={close} className="flex h-24 w-16 shrink-0 items-end justify-center overflow-hidden rounded-[3px] bg-stone p-1">
+                    <ProductImage product={product} title={false} bottleClassName="h-[88px]" />
                   </Link>
                   <div className="flex min-w-0 flex-1 flex-col">
                     <div className="flex justify-between gap-3">
                       <Link href={`/products/${product.slug}`} onClick={close} className="text-[14px] font-medium leading-snug hover:underline">
                         {product.name}
                       </Link>
-                      <p className="text-[14px] font-medium price">{formatPrice(product.price * qty)}</p>
+                      <p className="text-[14px] font-medium price">{formatPrice(product.price * qty, product.currency)}</p>
                     </div>
-                    <p className="mt-0.5 text-[13px] text-muted">{product.volume}</p>
+                    <p className="mt-0.5 text-[13px] text-muted">{productSpecs(product)}</p>
                     <div className="mt-auto flex items-center justify-between pt-3">
                       <QtyStepper value={qty} onChange={(q) => setQty(id, q)} />
                       <button type="button" onClick={() => removeItem(id)} className="text-[13px] text-muted underline-offset-2 hover:text-ink hover:underline">

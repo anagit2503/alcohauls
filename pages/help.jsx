@@ -1,10 +1,10 @@
 import Head from 'next/head'
-import { FREE_DELIVERY_THRESHOLD, DELIVERY_FEE } from '@/lib/products'
+import { MIN_ORDER, DELIVERY_FEE } from '@/lib/products'
 
 const FAQS = [
   {
     id: 'delivery', q: 'How does delivery work?',
-    a: `Order by 4pm and we deliver the same evening. Delivery is free on orders over $${FREE_DELIVERY_THRESHOLD}, otherwise it’s $${DELIVERY_FEE}. You choose a two-hour window at checkout.`,
+    a: `Order by 4pm and we deliver the same evening. Orders start at $${MIN_ORDER}, and delivery is a flat $${DELIVERY_FEE} whatever the order comes to. You choose a two-hour window at checkout.`,
   },
   {
     id: 'age', q: 'Why do you check ID?',
@@ -27,7 +27,7 @@ const FAQS = [
 export default function Help() {
   return (
     <>
-      <Head><title>Help | Alcohauls</title></Head>
+      <Head><title>Help | Noma Wine &amp; Liquor</title></Head>
       <div className="wrap max-w-3xl pt-10">
         <h1 className="font-display text-[40px] sm:text-[48px]">Help</h1>
         <p className="mt-2 text-muted">Answers to the questions we’re asked most.</p>

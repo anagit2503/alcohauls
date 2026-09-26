@@ -2,26 +2,27 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useAuthStore } from '@/store/authStore'
+import useUser from '@/hooks/useUser'
 import { formatPrice } from '@/lib/products'
 import useHydrated from '@/hooks/useHydrated'
 
 export default function Account() {
   const router = useRouter()
   const hydrated = useHydrated()
-  const user = useAuthStore((s) => s.user)
+  const { user, logout, loading } = useUser()
   const orders = useAuthStore((s) => s.orders)
-  const logout = useAuthStore((s) => s.logout)
 
-  if (!hydrated) return null
+  // The session is resolved in the browser, so wait for it rather than flashing the signed-out
+  // view at someone who is already signed in.
+  if (!hydrated || loading) return null
 
   if (!user) {
     return (
       <div className="wrap max-w-lg pt-16 text-center">
         <h1 className="font-display text-[38px]">Your account</h1>
-        <p className="mt-2 text-muted">Sign in to see your orders and saved details.</p>
+        <p className="mt-2 text-muted">Sign in with Google to see your orders and saved details.</p>
         <div className="mt-6 flex justify-center gap-3">
-          <Link href="/auth/login" className="btn-primary">Sign in</Link>
-          <Link href="/auth/register" className="btn-outline">Create an account</Link>
+          <Link href="/auth/login" className="btn-primary">Sign in with Google</Link>
         </div>
       </div>
     )
@@ -31,7 +32,7 @@ export default function Account() {
 
   return (
     <>
-      <Head><title>Your account | Alcohauls</title></Head>
+      <Head><title>Your account | Noma Wine &amp; Liquor</title></Head>
       <div className="wrap pt-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

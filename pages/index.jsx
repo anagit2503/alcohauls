@@ -1,30 +1,49 @@
 import Link from 'next/link'
-import { Truck, Clock, IdentificationCard, Snowflake } from '@phosphor-icons/react'
-import { PRODUCTS, CATEGORIES, byTag, getProduct, FREE_DELIVERY_THRESHOLD } from '@/lib/products'
+import { IdentificationCard, Snowflake } from '@phosphor-icons/react'
+import { isAvailable } from '@/lib/products'
+import { getAllProducts, toCard, categoriesWithCounts, usingSquare, REVALIDATE } from '@/lib/catalog'
 import ProductCard from '@/components/ProductCard'
 import Bottle from '@/components/Bottle'
 import SectionHead from '@/components/Section'
 
-// Bottles on the hero shelf, left to right.
-const SHELF = [17, 1, 9, 12, 24, 6]
+// Demo bottles on the hero shelf, left to right.
+const DEMO_SHELF = [17, 1, 9, 12, 24, 6]
 
 const POPULAR = ['Champagne', 'Single malt', 'Rosé', 'Tequila', 'Pinot Noir']
 
 const SERVICES = [
-  { icon: Clock, title: 'Same-day delivery', text: 'Order by 4pm, delivered this evening.' },
-  { icon: Truck, title: `Free over $${FREE_DELIVERY_THRESHOLD}`, text: 'Otherwise a flat $6.95.' },
   { icon: Snowflake, title: 'Arrives chilled', text: 'Whites and fizz come ready to pour.' },
   { icon: IdentificationCard, title: 'ID checked at the door', text: 'Recipients must be 21 or over.' },
 ]
 
-// The first product in each category, shown on its tile.
-const catBottle = (slug) => PRODUCTS.find((p) => p.category === slug)
-const catCount = (slug) => PRODUCTS.filter((p) => p.category === slug).length
+export async function getStaticProps() {
+  const all = await getAllProducts()
+  const available = all.filter(isAvailable)
+  const tagged = (tag) => available.filter((p) => p.tags?.includes(tag))
+  const newest = [...available].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))
 
-export default function Home() {
-  const bestsellers = byTag('bestseller').slice(0, 8)
-  const staff = byTag('staff')
-  const fresh = byTag('new').slice(0, 4)
+  const bestsellers = (tagged('bestseller').length ? tagged('bestseller') : available).slice(0, 8)
+  const fresh = (tagged('new').length ? tagged('new') : newest).filter((p) => !bestsellers.includes(p)).slice(0, 4)
+
+  // One bottle per category on the shelf where possible.
+  let shelf = usingSquare()
+    ? categoriesWithCounts(available).map((c) => available.find((p) => p.category === c.slug))
+    : DEMO_SHELF.map((id) => all.find((p) => p.id === id))
+  if (shelf.length < 6) shelf = [...shelf, ...bestsellers.filter((p) => !shelf.includes(p))]
+
+  return {
+    props: {
+      shelf: shelf.slice(0, 6).map(toCard),
+      categories: categoriesWithCounts(all).map((c) => ({ ...c, sample: toCard(all.find((p) => p.category === c.slug)) })),
+      bestsellers: bestsellers.map(toCard),
+      staff: tagged('staff').slice(0, 4).map(toCard),
+      fresh: fresh.map(toCard),
+    },
+    revalidate: REVALIDATE,
+  }
+}
+
+export default function Home({ shelf, categories, bestsellers, staff, fresh }) {
 
   return (
     <>
@@ -40,7 +59,7 @@ export default function Home() {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/products" className="btn-primary h-12 px-7">Shop all bottles</Link>
-              <Link href="/products?sort=rating" className="btn-outline h-12 px-7">See top rated</Link>
+              <a href="#categories" className="btn-outline h-12 px-7">Shop by category</a>
             </div>
             <div className="mt-9">
               <p className="text-[13px] text-muted">Popular right now</p>
@@ -65,10 +84,9 @@ export default function Home() {
             </p>
             <div className="relative w-full">
               <ul className="relative z-10 flex items-end justify-between gap-1 sm:gap-3">
-                {SHELF.map((id, i) => {
-                  const p = getProduct(id)
+                {shelf.map((p, i) => {
                   return (
-                    <li key={id} className="shelf-bottle min-w-0 flex-1" style={{ animationDelay: `${120 + i * 90}ms` }}>
+                    <li key={p.id} className="shelf-bottle min-w-0 flex-1" style={{ animationDelay: `${120 + i * 90}ms` }}>
                       <Link href={`/products/${p.slug}`} className="group block" aria-label={p.name}>
                         <Bottle product={p} title={false} className="mx-auto block h-auto max-h-[180px] w-full transition-transform duration-300 group-hover:-translate-y-2 sm:max-h-[270px]" />
                       </Link>
@@ -86,7 +104,7 @@ export default function Home() {
 
       {/* Service strip */}
       <section className="wrap mt-6">
-        <ul className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-line pb-8 pt-4 lg:grid-cols-4">
+        <ul className="grid grid-cols-1 gap-x-6 gap-y-5 border-b border-line pb-8 pt-4 sm:grid-cols-2">
           {SERVICES.map(({ icon: Icon, title, text }) => (
             <li key={title} className="flex gap-3">
               <Icon size={26} weight="light" className="mt-0.5 shrink-0 text-bottle" />
@@ -100,11 +118,11 @@ export default function Home() {
       </section>
 
       {/* Categories */}
-      <section className="wrap mt-16">
+      <section id="categories" className="wrap mt-16 scroll-mt-44">
         <SectionHead title="Shop by category" href="/products" linkText="Shop all" />
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {CATEGORIES.map((c) => {
-            const p = catBottle(c.slug)
+          {categories.map((c) => {
+            const p = c.sample
             return (
               <li key={c.slug}>
                 <Link
@@ -114,7 +132,7 @@ export default function Home() {
                 >
                   <div className="pb-4 sm:pb-5">
                     <p className="text-[15px] font-semibold leading-tight sm:text-[16px]">{c.name}</p>
-                    <p className="mt-0.5 text-[13px] text-muted">{catCount(c.slug)} bottles</p>
+                    <p className="mt-0.5 text-[13px] text-muted">{c.count} {c.count === 1 ? 'bottle' : 'bottles'}</p>
                   </div>
                   <Bottle product={p} title={false} className="-mb-6 h-[120px] shrink-0 transition-transform duration-300 group-hover:-translate-y-1 sm:h-[150px]" />
                 </Link>
@@ -138,7 +156,7 @@ export default function Home() {
       </section>
 
       {/* Staff picks */}
-      <section className="mt-24 bg-stone py-16">
+      {staff.length > 0 && <section className="mt-24 bg-stone py-16">
         <div className="wrap grid gap-10 lg:grid-cols-[1fr_3fr]">
           <div>
             <h2 className="font-display text-[34px] leading-tight sm:text-[40px]">What we’re drinking</h2>
@@ -150,15 +168,15 @@ export default function Home() {
             {staff.map((p) => <ProductCard key={p.id} product={p} note={p.staffNote} />)}
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* New */}
-      <section className="wrap mt-20">
+      {fresh.length > 0 && <section className="wrap mt-20">
         <SectionHead title="Just in" intro="New to the shop this month." href="/products?sort=newest" linkText="See all new" />
         <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4">
           {fresh.map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
-      </section>
+      </section>}
     </>
   )
 }

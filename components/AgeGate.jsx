@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { SHOP } from '@/lib/shop'
 
 const KEY = 'alcohauls-age-ok'
 
@@ -24,11 +25,14 @@ export default function AgeGate() {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-bottle-dark/90 p-4" role="dialog" aria-modal="true" aria-labelledby="age-title">
       <div className="w-full max-w-md rounded-[4px] bg-paper px-8 py-10 text-center shadow-2xl">
-        <p className="font-display text-[30px] leading-none">Alcohauls</p>
+        <p className="font-display text-[28px] leading-none">{SHOP.name}</p>
         {refused ? (
           <>
             <h2 id="age-title" className="mt-8 text-[18px] font-semibold">You need to be 21 or over to use this site</h2>
             <p className="mt-2 text-muted">Come back when you’re of legal drinking age.</p>
+            <button type="button" onClick={() => setRefused(false)} className="btn-ghost mt-6 underline underline-offset-4">
+              I chose the wrong answer
+            </button>
           </>
         ) : (
           <>

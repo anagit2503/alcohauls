@@ -1,21 +1,22 @@
 import Head from 'next/head'
 import Link from 'next/link'
 import { useCartStore, useCartSummary } from '@/store/cartStore'
-import { getCategory, formatPrice } from '@/lib/products'
+import { getCategory, formatPrice, MIN_ORDER } from '@/lib/products'
 import useHydrated from '@/hooks/useHydrated'
-import Bottle from '@/components/Bottle'
+import { ProductImage } from '@/components/Bottle'
+import { productSpecs } from '@/components/ProductCard'
 import OrderSummary from '@/components/OrderSummary'
 import { QtyStepper, DeliveryProgress } from '@/components/CartDrawer'
 
 export default function Cart() {
   const hydrated = useHydrated()
-  const { lines, count, subtotal, delivery, total } = useCartSummary()
+  const { lines, count, subtotal, delivery, total, shortfall, meetsMinimum } = useCartSummary()
   const setQty = useCartStore((s) => s.setQty)
   const removeItem = useCartStore((s) => s.removeItem)
 
   return (
     <>
-      <Head><title>Your bag | Alcohauls</title></Head>
+      <Head><title>Your bag | Noma Wine &amp; Liquor</title></Head>
       <div className="wrap pt-10">
         <h1 className="font-display text-[40px] sm:text-[48px]">Your bag</h1>
 
@@ -34,19 +35,19 @@ export default function Cart() {
                   <li key={id} className="flex gap-5 py-6">
                     <Link
                       href={`/products/${product.slug}`}
-                      className="flex h-32 w-24 shrink-0 items-end justify-center rounded-[3px] pb-2 sm:h-36 sm:w-28"
+                      className="flex h-32 w-24 shrink-0 items-end justify-center overflow-hidden rounded-[3px] p-2 sm:h-36 sm:w-28"
                       style={{ backgroundColor: getCategory(product.category).tint }}
                     >
-                      <Bottle product={product} title={false} className="h-[88%]" />
+                      <ProductImage product={product} title={false} bottleClassName="h-[95%]" />
                     </Link>
                     <div className="flex min-w-0 flex-1 flex-col">
                       <div className="flex justify-between gap-4">
                         <div>
                           <Link href={`/products/${product.slug}`} className="text-[16px] font-medium hover:underline">{product.name}</Link>
-                          <p className="mt-0.5 text-[13px] text-muted">{product.volume}, {product.abv}% ABV</p>
-                          <p className="mt-1 text-[14px] price">{formatPrice(product.price)} each</p>
+                          <p className="mt-0.5 text-[13px] text-muted">{productSpecs(product)}</p>
+                          <p className="mt-1 text-[14px] price">{formatPrice(product.price, product.currency)} each</p>
                         </div>
-                        <p className="text-[16px] font-semibold price">{formatPrice(product.price * qty)}</p>
+                        <p className="text-[16px] font-semibold price">{formatPrice(product.price * qty, product.currency)}</p>
                       </div>
                       <div className="mt-auto flex items-center gap-5 pt-4">
                         <QtyStepper value={qty} onChange={(q) => setQty(id, q)} />
@@ -64,7 +65,14 @@ export default function Cart() {
             <div className="space-y-4 lg:sticky lg:top-[180px] lg:self-start">
               <DeliveryProgress subtotal={subtotal} />
               <OrderSummary subtotal={subtotal} delivery={delivery} total={total}>
-                <Link href="/checkout" className="btn-primary mt-6 h-12 w-full">Check out</Link>
+                {meetsMinimum ? (
+                  <Link href="/checkout" className="btn-primary mt-6 h-12 w-full">Check out</Link>
+                ) : (
+                  <>
+                    <span aria-disabled="true" className="btn-primary mt-6 h-12 w-full cursor-not-allowed opacity-60">Check out</span>
+                    <p className="mt-2 text-center text-[13px] text-muted">Add {formatPrice(shortfall)} more to reach the {formatPrice(MIN_ORDER)} minimum.</p>
+                  </>
+                )}
               </OrderSummary>
             </div>
           </div>

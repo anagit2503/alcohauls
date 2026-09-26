@@ -1,16 +1,20 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+// Saves a copy of each product (a "card", see lib/catalog.js).
 export const useWishlistStore = create(
   persist(
     (set, get) => ({
-      ids: [],
-      toggle: (id) => {
-        const ids = get().ids
-        set({ ids: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] })
+      items: [],
+      toggle: (product) => {
+        const items = get().items
+        set({
+          items: items.some((p) => p.id === product.id)
+            ? items.filter((p) => p.id !== product.id)
+            : [...items, product],
+        })
       },
-      remove: (id) => set({ ids: get().ids.filter((x) => x !== id) }),
     }),
-    { name: 'alcohauls-wishlist' }
+    { name: 'alcohauls-saved' }
   )
 )

@@ -2,32 +2,34 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { useState } from 'react'
 import { Clock, Truck, ArrowCounterClockwise } from '@phosphor-icons/react'
-import { PRODUCTS, getProduct, getCategory, formatPrice, FREE_DELIVERY_THRESHOLD } from '@/lib/products'
+import { getCategory, formatPrice, isAvailable, MIN_ORDER, DELIVERY_FEE } from '@/lib/products'
+import { getAllProducts, toCard, toDetail, availableFirst, usingSquare, REVALIDATE } from '@/lib/catalog'
 import { useCartStore } from '@/store/cartStore'
-import Bottle from '@/components/Bottle'
+import { ProductImage } from '@/components/Bottle'
 import Rating from '@/components/Rating'
-import ProductCard, { WishlistButton } from '@/components/ProductCard'
+import ProductCard, { WishlistButton, productSpecs } from '@/components/ProductCard'
 import { QtyStepper } from '@/components/CartDrawer'
 import SectionHead from '@/components/Section'
 
-export default function ProductPage({ slug }) {
-  const product = getProduct(slug)
+export default function ProductPage({ product, related }) {
   const cat = getCategory(product.category)
   const addItem = useCartStore((s) => s.addItem)
   const [qty, setQty] = useState(1)
-
-  const related = PRODUCTS.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4)
+  const available = isAvailable(product)
+  const maxQty = product.stock == null ? 24 : Math.min(24, product.stock)
+  const { description, notes, ...card } = product
   const specs = [
     ['Type', product.style],
     ['Region', product.region],
     ['Size', product.volume],
-    ['Alcohol', `${product.abv}% ABV`],
+    ['Alcohol', product.abv != null ? `${product.abv}% ABV` : ''],
     ['Maker', product.maker],
-  ]
+  ].filter(([, v]) => v)
+  const lowStock = product.stock != null && product.stock > 0 && product.stock <= 5
 
   return (
     <>
-      <Head><title>{`${product.name} | Alcohauls`}</title></Head>
+      <Head><title>{`${product.name} | Noma Wine &amp; Liquor`}</title></Head>
       <div className="wrap pt-8">
         <nav aria-label="Breadcrumb" className="text-[13px] text-muted">
           <Link href="/" className="hover:text-ink">Home</Link>
@@ -37,44 +39,52 @@ export default function ProductPage({ slug }) {
           <span className="text-ink">{product.name}</span>
         </nav>
 
-        <div className="mt-6 grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
-          <div className="relative flex aspect-square items-end justify-center rounded-[4px] pb-[6%] lg:sticky lg:top-[180px] lg:aspect-auto lg:h-[620px] lg:self-start" style={{ backgroundColor: cat.tint }}>
-            <Bottle product={product} className="h-[82%]" />
+        <div className={`mt-6 grid gap-10 lg:gap-16 ${product.image ? 'lg:grid-cols-[400px_1fr]' : 'lg:grid-cols-[1.1fr_1fr]'}`}>
+          <div className={`relative flex aspect-square justify-center overflow-hidden rounded-[4px] lg:sticky lg:top-[180px] lg:self-start ${product.image ? 'items-center p-[8%]' : 'items-end pb-[6%] lg:aspect-auto lg:h-[620px]'}`} style={{ backgroundColor: product.image ? '#FFFFFF' : cat.tint }}>
+            <ProductImage product={product} bottleClassName="h-[82%]" />
           </div>
 
           <div className="lg:pt-4">
-            <p className="text-[14px] text-muted">{product.maker}</p>
+            <p className="text-[14px] text-muted">{product.maker || product.style || cat.name}</p>
             <h1 className="mt-1 font-display text-[36px] leading-[1.08] sm:text-[44px]">{product.name}</h1>
-            <Rating value={product.rating} count={product.reviews} className="mt-3 text-[14px]" />
-            <p className="mt-5 text-[26px] font-semibold price">{formatPrice(product.price)}</p>
-            <p className="text-[13px] text-muted">{product.volume}, {product.abv}% ABV</p>
+            {product.rating != null && <Rating value={product.rating} count={product.reviews} className="mt-3 text-[14px]" />}
+            <p className="mt-5 text-[26px] font-semibold price">{formatPrice(product.price, product.currency)}</p>
+            {productSpecs(product) && <p className="text-[13px] text-muted">{productSpecs(product)}</p>}
 
-            <p className="mt-6 max-w-prose text-[16px] leading-relaxed text-ink/85">{product.description}</p>
+            {description && <p className="mt-6 max-w-prose whitespace-pre-line text-[16px] leading-relaxed text-ink/85">{description}</p>}
 
-            <div className="mt-7 flex items-center gap-3">
-              <QtyStepper value={qty} onChange={(q) => setQty(Math.max(1, Math.min(24, q)))} size="lg" />
-              <button type="button" onClick={() => addItem(product.id, qty)} className="btn-primary h-11 flex-1">
-                Add to bag, {formatPrice(product.price * qty)}
-              </button>
-              <WishlistButton id={product.id} name={product.name} className="!h-11 !w-11 border border-line shadow-none" />
-            </div>
+            {available ? (
+              <div className="mt-7 flex items-center gap-3">
+                <QtyStepper value={qty} onChange={(q) => setQty(Math.max(1, Math.min(maxQty, q)))} size="lg" />
+                <button type="button" onClick={() => addItem(card, qty)} className="btn-primary h-11 flex-1">
+                  Add to bag, {formatPrice(product.price * qty, product.currency)}
+                </button>
+                <WishlistButton product={card} className="!h-11 !w-11 border border-line shadow-none" />
+              </div>
+            ) : (
+              <div className="mt-7 flex items-center gap-3">
+                <p className="btn h-11 flex-1 cursor-default bg-stone text-muted">Sold out</p>
+                <WishlistButton product={card} className="!h-11 !w-11 border border-line shadow-none" />
+              </div>
+            )}
+            {lowStock && <p className="mt-2 text-[13px] text-claret">Only {product.stock} left</p>}
 
             <ul className="mt-6 space-y-2.5 rounded-[3px] border border-line p-4 text-[14px]">
               <li className="flex gap-3"><Clock size={20} weight="light" className="shrink-0 text-bottle" />Order by 4pm for delivery this evening</li>
-              <li className="flex gap-3"><Truck size={20} weight="light" className="shrink-0 text-bottle" />Free delivery on orders over ${FREE_DELIVERY_THRESHOLD}</li>
+              <li className="flex gap-3"><Truck size={20} weight="light" className="shrink-0 text-bottle" />${DELIVERY_FEE} delivery · ${MIN_ORDER} minimum order</li>
               <li className="flex gap-3"><ArrowCounterClockwise size={20} weight="light" className="shrink-0 text-bottle" />Unopened bottles can be returned within 30 days</li>
             </ul>
 
-            <div className="mt-9">
+            {notes.length > 0 && <div className="mt-9">
               <h2 className="text-[14px] font-semibold">Tasting notes</h2>
               <ul className="mt-3 flex flex-wrap gap-2">
-                {product.notes.map((n) => (
+                {notes.map((n) => (
                   <li key={n} className="rounded-full bg-stone px-3.5 py-1.5 text-[14px]">{n}</li>
                 ))}
               </ul>
-            </div>
+            </div>}
 
-            <div className="mt-9">
+            {specs.length > 0 && <div className="mt-9">
               <h2 className="text-[14px] font-semibold">Details</h2>
               <dl className="mt-2 divide-y divide-line border-y border-line text-[14px]">
                 {specs.map(([k, v]) => (
@@ -84,7 +94,7 @@ export default function ProductPage({ slug }) {
                   </div>
                 ))}
               </dl>
-            </div>
+            </div>}
 
             {product.staffNote && (
               <blockquote className="mt-9 border-l-2 border-brass pl-5">
@@ -108,10 +118,20 @@ export default function ProductPage({ slug }) {
   )
 }
 
-export function getStaticPaths() {
-  return { paths: PRODUCTS.map((p) => ({ params: { slug: p.slug } })), fallback: false }
+export async function getStaticPaths() {
+  // Demo pages are built up front. Square pages are built on first visit, then cached.
+  if (usingSquare()) return { paths: [], fallback: 'blocking' }
+  const all = await getAllProducts()
+  return { paths: all.map((p) => ({ params: { slug: p.slug } })), fallback: 'blocking' }
 }
 
-export function getStaticProps({ params }) {
-  return { props: { slug: params.slug } }
+export async function getStaticProps({ params }) {
+  const all = await getAllProducts()
+  const product = all.find((p) => p.slug === params.slug)
+  if (!product) return { notFound: true, revalidate: REVALIDATE }
+  const related = availableFirst(all.filter((p) => p.category === product.category && p.id !== product.id)).slice(0, 4)
+  return {
+    props: { product: toDetail(product), related: related.map(toCard) },
+    revalidate: REVALIDATE,
+  }
 }

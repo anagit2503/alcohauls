@@ -1,18 +1,20 @@
 {
-  "name": "liquor-store-frontend",
+  "name": "alcohauls",
   "version": "1.0.0",
-  "description": "Premium liquor store e-commerce frontend",
+  "description": "Online bottle shop, with an optional Square catalogue",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "export": "next export"
+    "export": "next export",
+    "check:square": "node scripts/check-square.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "next": "^14.0.0",
+    "next-auth": "^4.24.15",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "zustand": "^4.4.0"

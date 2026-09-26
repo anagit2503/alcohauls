@@ -1,12 +1,14 @@
 import Head from 'next/head'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { CheckCircle } from '@phosphor-icons/react'
 import { useCartStore, useCartSummary } from '@/store/cartStore'
 import { useAuthStore } from '@/store/authStore'
-import { formatPrice } from '@/lib/products'
+import useUser from '@/hooks/useUser'
+import { formatPrice, MIN_ORDER } from '@/lib/products'
 import useHydrated from '@/hooks/useHydrated'
 import OrderSummary from '@/components/OrderSummary'
+import SquareCard, { cardPaymentsReady } from '@/components/SquareCard'
 
 const SLOTS = ['Today, 5pm to 7pm', 'Today, 7pm to 9pm', 'Tomorrow, 10am to 12pm', 'Tomorrow, 2pm to 4pm']
 
@@ -21,29 +23,74 @@ function Field({ label, id, className = '', ...props }) {
 
 export default function Checkout() {
   const hydrated = useHydrated()
-  const { lines, subtotal, delivery, total } = useCartSummary()
+  const { lines, subtotal, delivery, total, shortfall, meetsMinimum } = useCartSummary()
   const clearCart = useCartStore((s) => s.clearCart)
-  const user = useAuthStore((s) => s.user)
+  const { user } = useUser()
   const addOrder = useAuthStore((s) => s.addOrder)
   const [slot, setSlot] = useState(SLOTS[0])
   const [placed, setPlaced] = useState(null)
+  const [paying, setPaying] = useState(false)
+  const [payError, setPayError] = useState('')
+  const cardRef = useRef(null)
 
-  const placeOrder = (e) => {
+  // One key per attempt at this basket. Retrying after a decline reuses it, so a double-submit
+  // can never charge twice; a genuinely new order gets a new key.
+  const idempotencyKey = useRef(null)
+  if (!idempotencyKey.current) idempotencyKey.current = crypto.randomUUID()
+
+  const placeOrder = async (e) => {
     e.preventDefault()
+    if (paying) return
     const form = new FormData(e.currentTarget)
-    const order = {
-      number: `AH-${Math.floor(100000 + Math.random() * 900000)}`,
-      date: new Date().toISOString(),
-      name: form.get('name'),
-      email: form.get('email'),
-      slot,
-      total,
-      items: lines.map((l) => ({ id: l.id, qty: l.qty, name: l.product.name, price: l.product.price })),
+    if (!meetsMinimum) {
+      setPayError(`Orders start at ${formatPrice(MIN_ORDER)}. Add ${formatPrice(shortfall)} more to your bag.`)
+      return
     }
-    addOrder(order)
-    clearCart()
-    setPlaced(order)
-    window.scrollTo(0, 0)
+    setPayError('')
+    setPaying(true)
+
+    try {
+      const sourceId = await cardRef.current.tokenize()
+
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceId,
+          idempotencyKey: idempotencyKey.current,
+          items: lines.map((l) => ({ id: l.id, qty: l.qty })),
+          name: form.get('name'),
+          email: form.get('email'),
+          phone: form.get('phone'),
+          address: [form.get('address'), form.get('city'), form.get('state'), form.get('zip')]
+            .filter(Boolean).join(', '),
+          slot,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'That payment didn’t go through.')
+
+      const order = {
+        number: data.orderId.slice(-8).toUpperCase(),
+        date: new Date().toISOString(),
+        name: form.get('name'),
+        email: form.get('email'),
+        slot,
+        total: data.total,
+        receiptUrl: data.receiptUrl,
+        items: data.lines.map((l) => ({ id: l.id, qty: l.qty, name: l.name, price: l.price })),
+      }
+      addOrder(order)
+      clearCart()
+      setPlaced(order)
+      window.scrollTo(0, 0)
+    } catch (err) {
+      setPayError(err.message)
+      // A fresh key: the failed attempt is spent, and Square rejects a reused one on new details.
+      idempotencyKey.current = crypto.randomUUID()
+    } finally {
+      setPaying(false)
+    }
   }
 
   if (placed) {
@@ -59,6 +106,9 @@ export default function Checkout() {
         <div className="mt-8 flex justify-center gap-3">
           <Link href="/products" className="btn-primary">Keep shopping</Link>
           {user && <Link href="/account" className="btn-outline">View orders</Link>}
+          {placed.receiptUrl && (
+            <a href={placed.receiptUrl} target="_blank" rel="noreferrer" className="btn-outline">View receipt</a>
+          )}
         </div>
       </div>
     )
@@ -66,7 +116,7 @@ export default function Checkout() {
 
   return (
     <>
-      <Head><title>Checkout | Alcohauls</title></Head>
+      <Head><title>Checkout | Noma Wine &amp; Liquor</title></Head>
       <div className="wrap pt-10">
         <h1 className="font-display text-[40px] sm:text-[48px]">Checkout</h1>
 
@@ -118,12 +168,8 @@ export default function Checkout() {
 
               <fieldset>
                 <legend className="font-display text-[24px]">Payment</legend>
-                <p className="mt-1 text-[14px] text-muted">This is a demo shop, so no card is charged. Enter any numbers.</p>
-                <div className="mt-4 grid gap-4 sm:grid-cols-4">
-                  <Field label="Card number" id="card" inputMode="numeric" autoComplete="off" placeholder="1234 5678 9012 3456" className="sm:col-span-2" />
-                  <Field label="Expiry" id="exp" autoComplete="off" placeholder="MM / YY" />
-                  <Field label="CVC" id="cvc" inputMode="numeric" autoComplete="off" placeholder="123" />
-                </div>
+                <p className="mt-1 text-[14px] text-muted">Card details go straight to Square. They never reach this site.</p>
+                <SquareCard ref={cardRef} />
               </fieldset>
             </div>
 
@@ -137,7 +183,17 @@ export default function Checkout() {
                     </li>
                   ))}
                 </ul>
-                <button type="submit" className="btn-primary mt-6 h-12 w-full">Place order, {formatPrice(total)}</button>
+                {payError && (
+                  <p role="alert" className="mt-5 rounded-[3px] border border-claret/30 bg-claret/5 px-4 py-3 text-[14px] text-claret">{payError}</p>
+                )}
+                {!meetsMinimum && (
+                  <p className="mt-5 rounded-[3px] border border-line bg-stone px-4 py-3 text-[14px] text-muted">
+                    Orders start at {formatPrice(MIN_ORDER)}. Add {formatPrice(shortfall)} more to check out.
+                  </p>
+                )}
+                <button type="submit" disabled={paying || !meetsMinimum || !cardPaymentsReady()} className="btn-primary mt-6 h-12 w-full disabled:cursor-not-allowed disabled:opacity-60">
+                  {paying ? 'Taking payment…' : `Place order, ${formatPrice(total)}`}
+                </button>
                 <p className="mt-3 text-[12px] text-muted">By placing your order you confirm you are 21 or over. ID is checked on delivery.</p>
               </OrderSummary>
             </div>

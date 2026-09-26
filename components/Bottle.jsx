@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 
 // Silhouettes are drawn in a 120 × 300 box, centred on x = 60, standing on y = 292.
 // body: horizontal extent of the straight part (for the label); fill: where liquid starts;
@@ -56,7 +56,8 @@ export default function Bottle({ product, className = '', title = true }) {
   const lw = right - left - inset * 2
   const [ly, lh] = s.label
   const cx = 60
-  const shortMaker = maker.replace(/^(Château|Domaine|Maison|Bodega|Casa)\s/, '')
+  const brand = maker || name.replace(/\s*\(.*\)$/, '')
+  const shortMaker = brand.replace(/^(Château|Domaine|Maison|Bodega|Casa)\s/, '').split(/\s+/).slice(0, 3).join(' ')
   const makerSize = Math.min(9, (lw * 1.55) / Math.max(shortMaker.length, 6))
   const clip = `clip-${uid}`
   const shade = `shade-${uid}`
@@ -107,7 +108,7 @@ export default function Bottle({ product, className = '', title = true }) {
         style={{ fontFamily: 'var(--font-display), Georgia, serif' }} fontSize={Math.min(16, lw / 3.2)}
         fill={bottle.ink} fontStyle="italic"
       >
-        {initials(maker)}
+        {initials(brand)}
       </text>
       <line x1={cx - lw * 0.18} x2={cx + lw * 0.18} y1={ly + lh * 0.5} y2={ly + lh * 0.5} stroke={bottle.ink} strokeOpacity="0.5" strokeWidth="0.6" />
       <text
@@ -122,8 +123,53 @@ export default function Bottle({ product, className = '', title = true }) {
         style={{ fontFamily: 'var(--font-sans), sans-serif' }} fontSize="4.6" letterSpacing="0.6"
         fill={bottle.ink} opacity="0.7"
       >
-        {product.region.split(',')[0]}
+        {(product.region || product.volume || '').split(',')[0]}
       </text>
     </svg>
   )
+}
+
+// Almost every photo in the Square catalogue is a 160px thumbnail, so stretching one to fill a
+// card or the product page just magnifies its JPEG artefacts. Photos are never drawn larger than
+// they really are; past that the tile keeps the space and the photo stays sharp.
+// A little stretch is the cost of a photo that fills its frame; the card grid is dense enough that
+// cards stay at or under native size anyway, so this mostly gives the product page a usable hero.
+const MAX_UPSCALE = 1.5
+
+// A product's photo if it has one, otherwise its illustrated bottle.
+export function ProductImage({ product, className = '', bottleClassName = '', title = true }) {
+  // Set from the photo's real pixel size. Undefined until measured, so the first paint fills the
+  // tile and the photo only ever shrinks into place.
+  const [cap, setCap] = useState()
+
+  // A cached photo is already loaded by the time React hydrates, so its load event has come and
+  // gone and onLoad would never fire. The ref measures those on mount; onLoad catches the rest.
+  // Returning the previous cap unchanged lets React bail out, so the ref can't loop on re-render.
+  const measure = (img) => {
+    if (!img) return
+    const { naturalWidth: w, naturalHeight: h } = img
+    if (!w || !h) return
+    const maxWidth = Math.round(w * MAX_UPSCALE)
+    const maxHeight = Math.round(h * MAX_UPSCALE)
+    setCap((prev) => (prev && prev.maxWidth === maxWidth && prev.maxHeight === maxHeight ? prev : { maxWidth, maxHeight }))
+  }
+
+  if (product.image) {
+    return (
+      // Square's image host isn't known ahead of time, so a plain <img> is used instead of next/image.
+      // No blend mode: these photos are shot on white, and multiplying them into a tinted panel
+      // dulls the bottle and washes out its edge against the background.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        ref={(img) => { if (img?.complete) measure(img) }}
+        src={product.image}
+        alt={title ? product.name : ''}
+        loading="lazy"
+        onLoad={(e) => measure(e.currentTarget)}
+        style={cap}
+        className={`h-full w-full object-contain ${className}`}
+      />
+    )
+  }
+  return <Bottle product={product} title={title} className={bottleClassName} />
 }

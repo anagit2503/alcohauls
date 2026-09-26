@@ -1,18 +1,16 @@
 import Head from 'next/head'
 import Link from 'next/link'
 import { useWishlistStore } from '@/store/wishlistStore'
-import { getProduct } from '@/lib/products'
 import useHydrated from '@/hooks/useHydrated'
 import ProductCard from '@/components/ProductCard'
 
 export default function Wishlist() {
   const hydrated = useHydrated()
-  const ids = useWishlistStore((s) => s.ids)
-  const products = ids.map(getProduct).filter(Boolean)
+  const products = useWishlistStore((s) => s.items)
 
   return (
     <>
-      <Head><title>Wishlist | Alcohauls</title></Head>
+      <Head><title>Wishlist | Noma Wine &amp; Liquor</title></Head>
       <div className="wrap pt-10">
         <h1 className="font-display text-[40px] sm:text-[48px]">Wishlist</h1>
         {!hydrated ? null : products.length === 0 ? (
