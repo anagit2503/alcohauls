@@ -253,7 +253,7 @@ export default function Checkout() {
 
               <fieldset>
                 <legend className="font-display text-[24px]">Payment</legend>
-                <p className="mt-1 text-[14px] text-muted">Card details go straight to Square. They never reach this site.</p>
+                <p className="mt-1 text-[14px] text-muted">Secure payment by Square.</p>
                 <SquareCard ref={cardRef} />
               </fieldset>
             </div>
