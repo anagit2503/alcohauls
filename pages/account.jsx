@@ -36,7 +36,7 @@ export default function Account() {
       <div className="wrap pt-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="font-display text-[40px] sm:text-[48px]">Hello, {user.name.split(' ')[0]}</h1>
+            <h1 className="font-display text-[40px] sm:text-[48px]">{user.name ? `Hello, ${user.name.split(' ')[0]}` : 'Hello'}</h1>
             <p className="text-muted">{user.email}</p>
           </div>
           <button type="button" onClick={() => { logout(); router.push('/') }} className="btn-outline">Sign out</button>

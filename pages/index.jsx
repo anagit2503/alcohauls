@@ -132,7 +132,7 @@ export default function Home({ shelf, categories, bestsellers, staff, fresh }) {
                 >
                   <div className="pb-4 sm:pb-5">
                     <p className="text-[15px] font-semibold leading-tight sm:text-[16px]">{c.name}</p>
-                    <p className="mt-0.5 text-[13px] text-muted">{c.count} {c.count === 1 ? 'bottle' : 'bottles'}</p>
+                    <p className="mt-0.5 text-[13px] text-muted">{c.count} {c.count === 1 ? 'product' : 'products'}</p>
                   </div>
                   <Bottle product={p} title={false} className="-mb-6 h-[120px] shrink-0 transition-transform duration-300 group-hover:-translate-y-1 sm:h-[150px]" />
                 </Link>

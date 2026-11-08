@@ -12,6 +12,18 @@ import SquareCard, { cardPaymentsReady } from '@/components/SquareCard'
 
 const SLOTS = ['Today, 5pm to 7pm', 'Today, 7pm to 9pm', 'Tomorrow, 10am to 12pm', 'Tomorrow, 2pm to 4pm']
 
+// USPS answers in capitals ("40 PATTERSON ST NE"). Put back into the form, that reads better as
+// "40 Patterson St NE", keeping compass points and unit letters as they are.
+const DIRECTIONS = new Set(['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'])
+const tidy = (text) => text
+  .replace(/\b[A-Za-z]+\b/g, (w) => (DIRECTIONS.has(w.toUpperCase()) ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1).toLowerCase()))
+  .replace(/\b(\d+)(ST|ND|RD|TH)\b/gi, (_, n, suffix) => n + suffix.toLowerCase())
+
+const sameAddress = (a, b) => ['street', 'unit', 'city', 'state'].every((k) => (a[k] || '').trim().toUpperCase() === (b[k] || '').trim().toUpperCase())
+  && (a.zip || '').slice(0, 5) === (b.zip || '').slice(0, 5)
+
+const oneLine = (a) => [[a.street, a.unit].filter(Boolean).join(' '), a.city, `${a.state} ${a.zip}`].join(', ')
+
 function Field({ label, id, className = '', ...props }) {
   return (
     <div className={className}>
@@ -32,6 +44,36 @@ export default function Checkout() {
   const [paying, setPaying] = useState(false)
   const [payError, setPayError] = useState('')
   const cardRef = useRef(null)
+  const formRef = useRef(null)
+  const [addressError, setAddressError] = useState('')
+  // USPS's version of the address, when it differs from what was typed, waiting for the shopper to
+  // accept it or keep their own.
+  const [suggestion, setSuggestion] = useState(null)
+  // The last address USPS accepted (or the shopper confirmed), so paying again after a declined
+  // card doesn't check it twice.
+  const confirmedAddress = useRef('')
+
+  const readAddress = (form) => ({
+    street: form.get('address') || '', unit: form.get('unit') || '', city: form.get('city') || '',
+    state: (form.get('state') || '').toUpperCase(), zip: form.get('zip') || '',
+  })
+
+  const acceptSuggestion = () => {
+    const f = formRef.current.elements
+    const a = suggestion.address
+    f.address.value = tidy(a.street)
+    f.unit.value = tidy(a.unit)
+    f.city.value = tidy(a.city)
+    f.state.value = a.state
+    f.zip.value = a.zip
+    confirmedAddress.current = JSON.stringify(readAddress(new FormData(formRef.current)))
+    setSuggestion(null)
+  }
+
+  const keepMine = () => {
+    confirmedAddress.current = JSON.stringify(suggestion.entered)
+    setSuggestion(null)
+  }
 
   // One key per attempt at this basket. Retrying after a decline reuses it, so a double-submit
   // can never charge twice; a genuinely new order gets a new key.
@@ -47,9 +89,32 @@ export default function Checkout() {
       return
     }
     setPayError('')
+    setAddressError('')
+    setSuggestion(null)
     setPaying(true)
+    const deliverTo = readAddress(form)
 
     try {
+      // Check the address before touching the card, so a typo never costs a charge.
+      if (confirmedAddress.current !== JSON.stringify(deliverTo)) {
+        const check = await fetch('/api/address', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: deliverTo }),
+        }).then((r) => r.json()).catch(() => ({ ok: true, checked: false }))
+        if (!check.ok) {
+          setAddressError(check.message)
+          document.getElementById('delivery-address')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          return
+        }
+        if (check.checked && !sameAddress(deliverTo, check.address)) {
+          setSuggestion({ entered: deliverTo, address: check.address })
+          document.getElementById('delivery-address')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          return
+        }
+        confirmedAddress.current = JSON.stringify(deliverTo)
+      }
+
       const sourceId = await cardRef.current.tokenize()
 
       const res = await fetch('/api/checkout', {
@@ -62,12 +127,16 @@ export default function Checkout() {
           name: form.get('name'),
           email: form.get('email'),
           phone: form.get('phone'),
-          address: [form.get('address'), form.get('city'), form.get('state'), form.get('zip')]
-            .filter(Boolean).join(', '),
+          address: deliverTo,
           slot,
         }),
       })
       const data = await res.json()
+      if (!res.ok && data.field === 'address') {
+        confirmedAddress.current = ''
+        setAddressError(data.error)
+        return
+      }
       if (!res.ok) throw new Error(data.error || 'That payment didn’t go through.')
 
       const order = {
@@ -127,7 +196,7 @@ export default function Checkout() {
             <Link href="/products" className="btn-primary mt-6">Browse the shop</Link>
           </div>
         ) : (
-          <form onSubmit={placeOrder} className="mt-8 grid gap-10 lg:grid-cols-[1fr_400px]">
+          <form ref={formRef} onSubmit={placeOrder} className="mt-8 grid gap-10 lg:grid-cols-[1fr_400px]">
             <div className="space-y-10">
               <fieldset>
                 <legend className="font-display text-[24px]">Contact</legend>
@@ -144,14 +213,30 @@ export default function Checkout() {
                 </div>
               </fieldset>
 
-              <fieldset>
+              <fieldset id="delivery-address">
                 <legend className="font-display text-[24px]">Delivery address</legend>
+                <p className="mt-1 text-[14px] text-muted">We check it with USPS so the driver finds you first time.</p>
                 <div className="mt-4 grid gap-4 sm:grid-cols-6">
-                  <Field label="Street address" id="address" autoComplete="street-address" className="sm:col-span-6" />
+                  <Field label="Street address" id="address" autoComplete="address-line1" className="sm:col-span-4" />
+                  <Field label="Apt, suite (optional)" id="unit" autoComplete="address-line2" required={false} className="sm:col-span-2" />
                   <Field label="City" id="city" autoComplete="address-level2" className="sm:col-span-3" />
-                  <Field label="State" id="state" autoComplete="address-level1" className="sm:col-span-1" />
+                  <Field label="State" id="state" autoComplete="address-level1" maxLength={2} placeholder="DC" className="sm:col-span-1" />
                   <Field label="ZIP code" id="zip" autoComplete="postal-code" inputMode="numeric" className="sm:col-span-2" />
                 </div>
+                {addressError && (
+                  <p role="alert" className="mt-4 rounded-[3px] border border-claret/30 bg-claret/5 px-4 py-3 text-[14px] text-claret">{addressError}</p>
+                )}
+                {suggestion && (
+                  <div role="alert" className="mt-4 rounded-[3px] border border-line bg-stone px-4 py-4 text-[14px]">
+                    <p className="font-medium text-ink">USPS has this address as:</p>
+                    <p className="mt-1 text-ink">{oneLine(suggestion.address)}</p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button type="button" onClick={acceptSuggestion} className="btn-primary h-10">Use this address</button>
+                      <button type="button" onClick={keepMine} className="btn-outline h-10">Keep what I typed</button>
+                    </div>
+                    <p className="mt-3 text-muted">Then place your order again.</p>
+                  </div>
+                )}
               </fieldset>
 
               <fieldset>
@@ -192,7 +277,7 @@ export default function Checkout() {
                   </p>
                 )}
                 <button type="submit" disabled={paying || !meetsMinimum || !cardPaymentsReady()} className="btn-primary mt-6 h-12 w-full disabled:cursor-not-allowed disabled:opacity-60">
-                  {paying ? 'Taking payment…' : `Place order, ${formatPrice(total)}`}
+                  {paying ? 'Placing order…' : `Place order, ${formatPrice(total)}`}
                 </button>
                 <p className="mt-3 text-[12px] text-muted">By placing your order you confirm you are 21 or over. ID is checked on delivery.</p>
               </OrderSummary>

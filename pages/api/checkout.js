@@ -6,6 +6,7 @@ import { usingSquare } from '@/lib/catalog'
 import { fetchSquareItemsByIds } from '@/lib/square'
 import { PRODUCTS as DEMO_PRODUCTS, isAvailable, MIN_ORDER, DELIVERY_FEE } from '@/lib/products'
 import { createOrderAndPayment, paymentsConfigured, paymentsEnvironment } from '@/lib/squarePayments'
+import { uspsConfigured, verifyAddress, readAddress, formatAddress } from '@/lib/usps'
 
 const MAX_QTY = 24
 
@@ -66,7 +67,26 @@ export default async function handler(req, res) {
     const delivery = DELIVERY_FEE
     const total = subtotal + delivery
 
-    const note = [slot, address].filter(Boolean).join(' · ')
+    // The address is checked with USPS here, not only in the browser, so an order can't reach the
+    // driver with an address USPS says doesn't exist. If USPS is down the order still goes through,
+    // taken as typed and marked for the shop to check.
+    let deliverTo = readAddress(address)
+    if (!deliverTo.street || !deliverTo.city || !deliverTo.zip) {
+      return res.status(400).json({ error: 'Enter your delivery address.' })
+    }
+    let unchecked = !uspsConfigured()
+    if (!unchecked) {
+      try {
+        const check = await verifyAddress(deliverTo)
+        if (!check.ok) return res.status(422).json({ error: check.message, field: 'address' })
+        deliverTo = check.address
+      } catch (err) {
+        console.error('[checkout] USPS unavailable, taking the address as typed:', err.message)
+        unchecked = true
+      }
+    }
+
+    const note = [slot, formatAddress(deliverTo) + (unchecked ? ' (not checked with USPS)' : '')].filter(Boolean).join(' · ')
     const { order, payment } = await createOrderAndPayment({
       sourceId,
       idempotencyKey,

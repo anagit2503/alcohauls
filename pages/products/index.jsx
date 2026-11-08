@@ -136,7 +136,7 @@ export default function Products({ products, categories }) {
           <div>
             <div className="mb-6 flex items-center justify-between gap-4 border-b border-line pb-4">
               <p className="text-[14px] text-muted price" aria-live="polite">
-                {results.length} {results.length === 1 ? 'bottle' : 'bottles'}
+                {results.length} {results.length === 1 ? 'product' : 'products'}
               </p>
               <div className="flex items-center gap-3">
                 <button type="button" onClick={() => setFiltersOpen(true)} className="btn-ghost h-9 border border-line px-3 lg:hidden">

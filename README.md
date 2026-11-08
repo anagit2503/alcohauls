@@ -61,5 +61,6 @@ styles/           Tailwind setup and base styles
 
 - **Payments and orders.** Checkout collects details and shows a confirmation, but takes no payment
   and sends nothing to Square. That needs Square's Web Payments SDK and Orders API.
-- **Real accounts.** Sign-in, the bag and the wishlist are saved in the visitor's own browser only.
-  They don't sync between devices and aren't secure enough for real customer accounts.
+- **Server-side accounts.** Sign-in (Google, Apple or an emailed link) is real, but the bag,
+  wishlist and past orders are saved in the visitor's own browser, so they don't follow a shopper
+  between devices. That needs a database.

@@ -1,7 +1,7 @@
 import { useSession, signOut } from 'next-auth/react'
 
-// One place to ask "who is signed in?". Google is the only way in, so this is a thin wrapper over
-// the NextAuth session that keeps pages from each knowing that.
+// One place to ask "who is signed in?", whether they came in through Google, Apple or an email link.
+// A thin wrapper over the NextAuth session. Apple and email sign-ins often carry no name.
 export default function useUser() {
   const { data: session, status } = useSession()
   const user = session?.user
